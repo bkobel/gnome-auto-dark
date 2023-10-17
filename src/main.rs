@@ -14,10 +14,30 @@ use std::time::Duration;
 const CONFIG_PATH: &str = "~/.gnome-ad-config.yaml";
 
 #[derive(Debug, Serialize, Deserialize)]
+struct Theme {
+    light_gtk_theme: String,
+    dark_gtk_theme: String,
+    light_color_theme: String,
+    dark_color_theme: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 struct Settings {
     schedule_light_mode: String,
     schedule_dark_mode: String,
-    cycle_rate: u64
+    cycle_rate_seconds: u64,
+    theme: Theme,
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Theme {
+            light_gtk_theme: "Flat-Remix-GTK-Blue-Light-Solid".to_string(),
+            dark_gtk_theme: "Flat-Remix-GTK-Blue-Dark-Solid".to_string(),
+            light_color_theme: "prefer-light".to_string(),
+            dark_color_theme: "prefer-dark".to_string(),
+        }
+    }
 }
 
 impl Default for Settings {
@@ -25,7 +45,8 @@ impl Default for Settings {
         Settings {
             schedule_light_mode: "07:00".to_string(),
             schedule_dark_mode: "19:00".to_string(),
-            cycle_rate: 600 // 10 minutes
+            cycle_rate_seconds: 600, // 10 minutes
+            theme: Theme::default(),
         }
     }
 }
@@ -36,7 +57,7 @@ fn main() {
     loop {
         let settings = bootstrap_settings(&config_path);
 
-        let loop_duration = Duration::from_secs(settings.cycle_rate);
+        let loop_duration = Duration::from_secs(settings.cycle_rate_seconds);
 
         let current_time = Local::now().time();
         println!("{:?}", current_time);
@@ -44,16 +65,18 @@ fn main() {
         let light_time = NaiveTime::parse_from_str(&settings.schedule_light_mode, "%H:%M").unwrap();
         let dark_time = NaiveTime::parse_from_str(&settings.schedule_dark_mode, "%H:%M").unwrap();
 
-        let theme_preference = determine_theme(current_time, light_time, dark_time);
+        let theme_preference = determine_theme(current_time, light_time, dark_time, &settings);
         set_gnome_theme(theme_preference);
 
         sleep(loop_duration);
     }
 }
 
-fn determine_theme(current_time: NaiveTime, light_time: NaiveTime, dark_time: NaiveTime) -> (&'static str, &'static str) {
-    let light_theme = ("prefer-light", "Flat-Remix-GTK-Blue-Light-Solid");
-    let dark_theme = ("prefer-dark", "Flat-Remix-GTK-Blue-Dark-Solid");
+fn determine_theme<'a>(
+        current_time: NaiveTime, light_time: NaiveTime, dark_time: NaiveTime, settings: &'a Settings
+    ) -> (&'a str, &'a str) {
+    let light_theme = (settings.theme.light_color_theme.as_str(), settings.theme.light_gtk_theme.as_str());
+    let dark_theme = (settings.theme.dark_color_theme.as_str(), settings.theme.dark_gtk_theme.as_str());
 
     if (light_time < dark_time && current_time > light_time && current_time < dark_time) 
         || (dark_time < light_time && !(current_time > dark_time && current_time < light_time)) {
@@ -119,14 +142,30 @@ mod tests {
     fn naive_time_or_panic(h: u32, m: u32, s: u32) -> NaiveTime {
         NaiveTime::from_hms_opt(h, m, s).expect("Invalid time provided")
     }
-
+    
+    fn mock_settings() -> Settings {
+        Settings {
+            schedule_light_mode: "".to_string(),
+            schedule_dark_mode: "".to_string(),
+            cycle_rate_seconds: 1,
+            theme: Theme {
+                light_gtk_theme: "Flat-Remix-GTK-Blue-Light-Solid".to_string(),
+                dark_gtk_theme: "Flat-Remix-GTK-Blue-Dark-Solid".to_string(),
+                light_color_theme: "prefer-light".to_string(),
+                dark_color_theme: "prefer-dark".to_string(),
+            },
+        }
+    }
+    
     // light before dark
     #[test]
     fn test_light_before_dark_in_range() {
         let current = naive_time_or_panic(12, 0, 0);
         let light = naive_time_or_panic(7, 0, 0);
         let dark = naive_time_or_panic(19, 0, 0);
-        assert_eq!(determine_theme(current, light, dark), ("prefer-light", "Flat-Remix-GTK-Blue-Light-Solid"));
+        let settings = mock_settings();
+
+        assert_eq!(determine_theme(current, light, dark, &settings), ("prefer-light", "Flat-Remix-GTK-Blue-Light-Solid"));
     }
 
     #[test]
@@ -134,7 +173,9 @@ mod tests {
         let current = naive_time_or_panic(20, 0, 0);
         let light = naive_time_or_panic(7, 0, 0);
         let dark = naive_time_or_panic(19, 0, 0);
-        assert_eq!(determine_theme(current, light, dark), ("prefer-dark", "Flat-Remix-GTK-Blue-Dark-Solid"));
+        let settings = mock_settings();
+
+        assert_eq!(determine_theme(current, light, dark, &settings), ("prefer-dark", "Flat-Remix-GTK-Blue-Dark-Solid"));
     }
 
     #[test]
@@ -142,7 +183,9 @@ mod tests {
         let current = naive_time_or_panic(23, 59, 59);
         let light = naive_time_or_panic(7, 0, 0);
         let dark = naive_time_or_panic(23, 0, 0);
-        assert_eq!(determine_theme(current, light, dark), ("prefer-dark", "Flat-Remix-GTK-Blue-Dark-Solid"));
+        let settings = mock_settings();
+
+        assert_eq!(determine_theme(current, light, dark, &settings), ("prefer-dark", "Flat-Remix-GTK-Blue-Dark-Solid"));
     }
 
     #[test]
@@ -150,7 +193,9 @@ mod tests {
         let current = naive_time_or_panic(0, 0, 0);
         let light = naive_time_or_panic(7, 0, 0);
         let dark = naive_time_or_panic(23, 0, 0);
-        assert_eq!(determine_theme(current, light, dark), ("prefer-dark", "Flat-Remix-GTK-Blue-Dark-Solid"));
+        let settings = mock_settings();
+
+        assert_eq!(determine_theme(current, light, dark, &settings), ("prefer-dark", "Flat-Remix-GTK-Blue-Dark-Solid"));
     }
 
     // dark before light
@@ -159,7 +204,9 @@ mod tests {
         let current = naive_time_or_panic(6, 0, 0);
         let light = naive_time_or_panic(19, 0, 0);
         let dark = naive_time_or_panic(7, 0, 0);
-        assert_eq!(determine_theme(current, light, dark), ("prefer-light", "Flat-Remix-GTK-Blue-Light-Solid"));
+        let settings = mock_settings();
+
+        assert_eq!(determine_theme(current, light, dark, &settings), ("prefer-light", "Flat-Remix-GTK-Blue-Light-Solid"));
     }
 
     #[test]
@@ -167,7 +214,9 @@ mod tests {
         let current = naive_time_or_panic(18, 0, 0);
         let light = naive_time_or_panic(19, 0, 0);
         let dark = naive_time_or_panic(7, 0, 0);
-        assert_eq!(determine_theme(current, light, dark), ("prefer-dark", "Flat-Remix-GTK-Blue-Dark-Solid"));
+        let settings = mock_settings();
+
+        assert_eq!(determine_theme(current, light, dark, &settings), ("prefer-dark", "Flat-Remix-GTK-Blue-Dark-Solid"));
     }
 
     #[test]
@@ -175,7 +224,9 @@ mod tests {
         let current = naive_time_or_panic(23, 59, 59);
         let light = naive_time_or_panic(19, 0, 0);
         let dark = naive_time_or_panic(7, 0, 0);
-        assert_eq!(determine_theme(current, light, dark), ("prefer-light", "Flat-Remix-GTK-Blue-Light-Solid"));
+        let settings = mock_settings();
+
+        assert_eq!(determine_theme(current, light, dark, &settings), ("prefer-light", "Flat-Remix-GTK-Blue-Light-Solid"));
     }
 
     #[test]
@@ -183,6 +234,8 @@ mod tests {
         let current = naive_time_or_panic(0, 0, 0);
         let light = naive_time_or_panic(19, 0, 0);
         let dark = naive_time_or_panic(7, 0, 0);
-        assert_eq!(determine_theme(current, light, dark), ("prefer-light", "Flat-Remix-GTK-Blue-Light-Solid"));
+        let settings = mock_settings();
+
+        assert_eq!(determine_theme(current, light, dark, &settings), ("prefer-light", "Flat-Remix-GTK-Blue-Light-Solid"));
     }
 }

@@ -23,12 +23,18 @@ Example configuration:
 ```yaml
 schedule_light_mode: "07:00"
 schedule_dark_mode: "19:00"
-cycle_rate: 600
+cycle_rate_seconds: 600
+
+theme:
+  light_gtk_theme: Flat-Remix-GTK-Blue-Light-Solid
+  dark_gtk_theme: Flat-Remix-GTK-Blue-Dark-Solid
+  light_color_theme: prefer-light
+  dark_color_theme: prefer-dark
 ```
 
 * `schedule_light_mode`: The time to switch to the light theme.
 * `schedule_dark_mode`: The time to switch to the dark theme.
-* `cycle_rate`: How often (in seconds) the program checks the current time and updates the theme.
+* `cycle_rate_seconds`: How often (in seconds) the program checks the current time and updates the theme.
 
 
 ## Usage
@@ -36,6 +42,11 @@ cycle_rate: 600
 cargo build --release && ./target/release/gnome_auto_dark
 ```
 Simply run the compiled binary. The tool will check the time against the specified schedule in the configuration file and set the GNOME theme accordingly.
+
+To create linux daemon simply run 
+```bash
+sudo ./install_daemon.sh
+```
 
 ## Testing
 Tests are included to ensure that the theme switcher works correctly under various scenarios.
