@@ -2,7 +2,7 @@
 
 This Rust utility automatically switches between light and dark GNOME themes based on specified time spans utilizing `gsettings` command-line tool.
 
-![Build Status](https://github.com/bkobel/gnome-auto-dark/workflows/Rust%20CI/badge.svg)
+[![Build Status](https://github.com/bkobel/gnome-auto-dark/workflows/Rust%20CI/badge.svg)](https://github.com/bkobel/gnome-auto-dark/actions/workflows/rust_ci.yml)
 
 ## Features
 - Automatically switches between predefined light and dark themes.
